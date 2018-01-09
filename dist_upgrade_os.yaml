@@ -1,0 +1,92 @@
+##upgrade OS to latest major release##
+---
+- hosts: all
+  remote_user: sundar
+  become: true
+  become_method: sudo
+  vars: 
+   TIME: "{{ ansible_date_time.epoch }}"
+
+  
+  tasks: 
+  - debug:
+     msg: "No need of OS upgrade, since no new releases available"
+    when: ansible_distribution == 'Ubuntu' and ansible_distribution_version >= '16.04'
+  - block:
+    - debug:
+       msg: "Server version is {{ ansible_distribution_version }}. It will be upgraded to release 16.04."
+
+##Collect package details before any changes ##
+    - name: collect installed package lists
+      shell: dpkg-query -W -f '${binary:Package} --- ${Version}\n' > /root/{{ inventory_hostname }}
+      tags: collect_data
+    - name: fetch the list to local machine
+      fetch: 
+       src: /root/{{ inventory_hostname }}
+       dest: /root/package_list/{{ inventory_hostname }}/dist-{{ TIME }}
+       flat: yes
+       fail_on_missing: yes
+      tags: collect_data
+    - name: remove temp files
+      file: 
+       path: /root/{{ inventory_hostname }}
+       state: absent
+      tags: collect_data
+
+## Do upgrade OS###
+    - name: update repositary
+      apt:
+       update_cache: yes
+       upgrade: dist
+      async: 1000
+      poll: 20
+    - name: ensure update manager installed
+      apt: 
+       name: update-manager-core
+       state: present
+    - name: do install latest release
+      command: do-release-upgrade -f DistUpgradeViewNonInteractive 
+      async: 6000
+      poll: 30
+
+##Collect package details and reboot system ##
+    - name: collect installed package lists
+      shell: dpkg-query -W -f '${binary:Package} --- ${Version}\n' > /root/post-{{ inventory_hostname }}
+    - name: fetch the list to local machine
+      fetch:
+       src: /root/post-{{ inventory_hostname }}
+       dest: /root/package_list/{{ inventory_hostname }}/dist-post-{{ TIME }}
+       flat: yes
+       fail_on_missing: yes
+    - name: remove temp files
+      file:
+       path: /root/post-{{ inventory_hostname }}
+       state: absent
+    - name: restart the system
+      shell: sleep 2 && shutdown -r now "Ansible OS upgrade triggered restart"
+      async: 1
+      poll: 0
+    - name: wait for system to come up
+      local_action:
+       module: wait_for
+       port: 22
+       host: "{{ ansible_host }}"
+       delay: 30
+       state: started
+       timeout: 300
+
+## collect package details once again ##
+    - name: collect installed package lists
+      shell: dpkg-query -W -f '${binary:Package} --- ${Version}\n' > /root/post-{{ inventory_hostname }}
+    - name: fetch the list to local machine
+      fetch:
+       src: /root/post-{{ inventory_hostname }}
+       dest: /root/package_list/{{ inventory_hostname }}/dist-post2-{{ TIME }}
+       flat: yes
+       fail_on_missing: yes
+    - name: remove temp files
+      file:
+       path: /root/post-{{ inventory_hostname }}
+       state: absent
+    when: ansible_distribution == 'Ubuntu' and ansible_distribution_version <= '15.04'
+...

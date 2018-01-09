@@ -1,0 +1,47 @@
+---
+- hosts: all
+  remote_user: sundar
+  become: true
+  become_method: sudo
+  vars: 
+   TIME: "{{ ansible_date_time.epoch }}"
+  
+  tasks: 
+  - name: collect installed package lists
+    shell: dpkg-query -W -f '${binary:Package} --- ${Version}\n' > /root/{{ inventory_hostname }}
+    tags: collect_data
+  - name: fetch the list to local machine
+    fetch: 
+     src: /root/{{ inventory_hostname }}
+     dest: /root/package_list/{{ inventory_hostname }}/{{ TIME }}
+     flat: yes
+     fail_on_missing: yes
+    tags: collect_data
+  - name: remove temp files
+    file: 
+     path: /root/{{ inventory_hostname }}
+     state: absent
+    tags: collect_data
+  - name: update repositary
+    apt:
+     update_cache: yes
+     upgrade: safe
+    async: 1000
+    poll: 20
+    tags: upgrade_os
+  - name: collect installed package lists
+    shell: dpkg-query -W -f '${binary:Package} --- ${Version}\n' > /root/post-{{ inventory_hostname }}
+    tags: post_collect_data
+  - name: fetch the list to local machine
+    fetch:
+     src: /root/post-{{ inventory_hostname }}
+     dest: /root/package_list/{{ inventory_hostname }}/post-{{ TIME }}
+     flat: yes
+     fail_on_missing: yes
+    tags: post_collect_data
+  - name: remove temp files
+    file:
+     path: /root/post-{{ inventory_hostname }}
+     state: absent
+    tags: post_collect_data
+...
