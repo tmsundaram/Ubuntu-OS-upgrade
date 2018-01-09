@@ -4,7 +4,7 @@ Tested on Ubuntu 14.04 and 16.04. Upgrade from 14.04 to 16.04 is fully supported
 
 for minor OS update/patching use this command.
 
-#ansible-playbook os_update -K
+#ansible-playbook os_update.yaml -K
  
 To upgrade from Ubuntu 14.04 to 16.04. Use the command below.
 
@@ -12,7 +12,7 @@ To upgrade from Ubuntu 14.04 to 16.04. Use the command below.
 
 To list the currently installec packages alone use this command.
 
-#ansible-playbook os_update -K --tags collect_data
+#ansible-playbook os_update.yaml -K --tags collect_data
 
 - Host name and remote user must set in ansible hosts file. Default: /etc/ansible/hosts
 - User must have sudo privileges and ssh keys configured already
